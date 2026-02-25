@@ -352,7 +352,7 @@
     }
     function triggerWithdraw() {
         if (balance < 50) return showToast("Minimum withdrawal is KES 50", false);
-        showToast(`KES ${balance.toFixed(2)} withdrawn to M-Pesa account +254757080224 succefully.`);
+        showToast(`KES ${balance.toFixed(2)} withdrawn to M-Pesa account +254757080224 Succefully.`);
         balance = 0;
         updateBalanceUI();
     }
