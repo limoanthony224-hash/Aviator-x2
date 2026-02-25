@@ -11,7 +11,6 @@
     <meta name="theme-color" content="#0b0b0b">
      <link rel="apple-touch-icon" href="my-photo.jpg">
 
-
     <style>
         :root {
             --bg-dark: #0b0b0b;
