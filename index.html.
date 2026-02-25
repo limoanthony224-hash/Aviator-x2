@@ -1,0 +1,365 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Aviator Pro - Precision Flight</title>
+    
+    <link rel="manifest" id="pwa-manifest">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="theme-color" content="#0b0b0b">
+    <link rel="apple-touch-icon" href="https://img.icons8.com/ios-filled/512/ff0000/fighter-jet.png">
+
+    <style>
+        :root {
+            --bg-dark: #0b0b0b;
+            --panel-bg: #1c1c1c;
+            --accent-gold: #ffca28;
+            --accent-red: #e91e63;
+            --success-green: #28a745;
+            --mpesa-green: #49aa27;
+            --text-main: #ffffff;
+            --text-dim: #888;
+        }
+
+        body {
+            background-color: var(--bg-dark); color: var(--text-main);
+            font-family: 'Segoe UI', Roboto, sans-serif;
+            margin: 0; padding: 0; display: flex; justify-content: center;
+            height: 100vh; overflow: hidden;
+        }
+
+        .game-container {
+            width: 100vw; height: 100vh; max-width: 400px;
+            background: var(--panel-bg); display: flex; flex-direction: column;
+            position: relative;
+        }
+
+        /* Notifications */
+        #toast {
+            position: absolute; top: -100px; left: 10px; right: 10px;
+            background: #333; color: green; padding: 12px; border-radius: 8px;
+            z-index: 1000; transition: 0.5s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+            text-align: center; border-left: 5px solid var(--mpesa-green);
+            box-shadow: 0 5px 15px rgba(0,0,0,0.5); font-size: 0.85rem;
+        }
+        #toast.show { top: 20px; }
+
+        .history-bar {
+            background: #000; height: 35px; display: flex; align-items: center;
+            gap: 8px; padding: 0 10px; overflow-x: auto; border-bottom: 1px solid #333;
+        }
+        .hist-val { font-size: 0.65rem; font-weight: bold; padding: 3px 8px; border-radius: 10px; background: #222; white-space: nowrap; }
+
+        .header {
+            padding: 10px 12px; display: flex; justify-content: space-between;
+            align-items: center; background: #1a1a1a; border-bottom: 1px solid #333;
+        }
+
+        .chart-area { flex: 1.5; background: #050505; position: relative; overflow: hidden; border-bottom: 2px solid #111; }
+
+        #multiplier {
+            position: absolute; top: 25%; width: 100%; text-align: center;
+            font-size: 3.5rem; font-weight: 900; z-index: 10;
+        }
+
+        #next-round-timer {
+            position: absolute; top: 40%; width: 100%; text-align: center; z-index: 30; display: none;
+        }
+        .progress-bar { width: 140px; height: 6px; background: #333; margin: 10px auto; border-radius: 5px; overflow: hidden; }
+        #progress-fill { width: 100%; height: 100%; background: var(--mpesa-green); transition: width 0.05s linear; }
+
+        #plane-wrapper {
+            position: absolute; bottom: 0; left: 0; width: 55px; z-index: 25; display: none;
+            margin-left: -5px; margin-bottom: -5px; 
+        }
+
+        #flight-curve { position: absolute; width: 100%; height: 100%; z-index: 20; }
+
+        /* BET SECTION - FIXED & VISIBLE */
+        .bet-section { padding: 12px; background: #111; display: flex; flex-direction: column; gap: 12px; }
+        .bet-row {
+            display: grid; grid-template-columns: 1fr 1.2fr; gap: 10px;
+            background: #1c1c1c; padding: 12px; border-radius: 12px; border: 1px solid #333;
+        }
+        .bet-input {
+            background: #000; color: #fff; border: 1px solid #444; border-radius: 8px;
+            text-align: center; font-weight: bold; font-size: 1.2rem; width: 100%; outline: none;
+        }
+        .bet-btn {
+            border-radius: 8px; border: none; font-weight: 900; color: white;
+            height: 50px; cursor: pointer; font-size: 1.1rem; text-transform: uppercase;
+        }
+
+        .players-box {
+            flex: 1; background: #080808; margin: 0 12px 12px; border-radius: 12px;
+            overflow-y: auto; padding: 12px; border: 1px solid #222;
+        }
+        .player-row { display: flex; justify-content: space-between; font-size: 0.75rem; padding: 6px 0; border-bottom: 1px solid #151515; }
+
+        .modal {
+            display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.9);
+            z-index: 600; justify-content: center; align-items: center;
+        }
+    </style>
+</head>
+<body>
+
+<div id="toast">Message</div>
+
+<div class="game-container">
+    <div class="history-bar" id="history-list"></div>
+
+    <div class="header">
+        <div>
+            <div style="font-size: 0.5rem; color: var(--text-dim); letter-spacing: 1px;">WALLET BALANCE</div>
+            <div id="balance-amount" style="color:var(--success-green); font-weight:800; font-size: 1.1rem;">KES 1,000.00</div>
+        </div>
+        <div style="display:flex; gap:8px;">
+            <button onclick="triggerWithdraw()" style="background:#333; border:none; color:white; border-radius:6px; padding:6px 12px; font-weight:bold; font-size:0.7rem;">WITHDRAW</button>
+            <button onclick="triggerMpesaPush()" style="background:var(--mpesa-green); border:none; color:white; border-radius:6px; padding:6px 15px; font-weight:bold; font-size:0.7rem;">DEPOSIT</button>
+        </div>
+    </div>
+
+    <div class="chart-area" id="chart">
+        <div id="next-round-timer">
+            <div style="color: var(--accent-gold); font-weight: bold; font-size: 0.8rem;">WAITING FOR NEXT ROUND</div>
+            <div class="progress-bar"><div id="progress-fill"></div></div>
+        </div>
+        
+        <svg id="flight-curve" viewBox="0 0 400 300" preserveAspectRatio="none">
+            <path id="curve-path" d="" fill="none" stroke="#e91e63" stroke-width="4" stroke-linecap="round"/>
+        </svg>
+
+        <div id="multiplier">1.00x</div>
+        
+        <div id="plane-wrapper">
+            <img src="https://img.icons8.com/ios-filled/100/ff0000/fighter-jet.png" style="width:100%; transform: rotate(-15deg);">
+        </div>
+    </div>
+
+    <div class="bet-section">
+        <div class="bet-row">
+            <input type="number" id="bet-1-amt" class="bet-input" value="100" min="10">
+            <button id="btn-1" class="bet-btn" onclick="handleBetAction(1)" style="background:var(--success-green);">BET</button>
+        </div>
+        <div class="bet-row">
+            <input type="number" id="bet-2-amt" class="bet-input" value="100" min="10">
+            <button id="btn-2" class="bet-btn" onclick="handleBetAction(2)" style="background:var(--success-green);">BET</button>
+        </div>
+    </div>
+    <div class="players-box" id="player-feed"></div>
+</div>
+
+<div id="mpesa-modal" class="modal">
+    <div style="background:green; padding:25px; border-radius:15px; width:260px; text-align:center;">
+        <h3 style="color:var(--mpesa-green); margin-top:0;">M-PESA DEPOSIT</h3>
+        <input type="password" id="mpesa-pin" maxlength="4" placeholder="ENTER PIN" style="width:90%; padding:12px; margin-bottom:15px; text-align:center; font-size:1.5rem; letter-spacing:5px; border: 1px solid #ccc; border-radius: 8px;">
+        <button onclick="confirmDeposit()" style="width:100%; padding:14px; background:var(--mpesa-green); border:none; color:white; border-radius:8px; font-weight:bold; font-size: 1rem;">CONFIRM</button>
+    </div>
+</div>
+
+<script>
+    let balance = 1000.00;
+    let multiplier = 1.00;
+    let isFlying = false;
+    let history = ["1.25", "4.50", "1.10", "2.80", "15.20", "1.02"];
+    let bets = { 
+        1: { state: 'none', amount: 0 }, 
+        2: { state: 'none', amount: 0 } 
+    };
+    let fakePlayers = [];
+
+    function showToast(msg, success = true) {
+        const t = document.getElementById('toast');
+        t.innerText = msg;
+        t.style.borderLeftColor = success ? 'var(--mpesa-green)' : 'var(--accent-red)';
+        t.classList.add('show');
+        setTimeout(() => t.classList.remove('show'), 3000);
+    }
+
+    function updateBalanceUI() {
+        document.getElementById('balance-amount').innerText = "KES " + balance.toFixed(2);
+    }
+
+    function handleBetAction(id) {
+        const btn = document.getElementById(`btn-${id}`);
+        const input = document.getElementById(`bet-${id}-amt`);
+        const amt = parseFloat(input.value);
+
+        if (bets[id].state === 'none') {
+            if (amt > balance || amt < 10) {
+                showToast("Invalid Amount or Insufficient Balance", false);
+                return;
+            }
+            balance -= amt;
+            bets[id] = { state: 'waiting', amount: amt };
+            btn.innerText = "CANCEL";
+            btn.style.background = "var(--accent-red)";
+            updateBalanceUI();
+        } 
+        else if (bets[id].state === 'waiting') {
+            balance += bets[id].amount;
+            bets[id] = { state: 'none', amount: 0 };
+            btn.innerText = "BET";
+            btn.style.background = "var(--success-green)";
+            updateBalanceUI();
+        } 
+        else if (bets[id].state === 'active') {
+            const win = bets[id].amount * multiplier;
+            balance += win;
+            bets[id].state = 'cashed';
+            btn.innerText = "WON!";
+            btn.style.background = "#444";
+            btn.style.color = "var(--success-green)";
+            showToast(`CASHOUT SUCCESS: KES ${win.toFixed(2)}`);
+            updateBalanceUI();
+        }
+    }
+
+    function startCooldown() {
+        isFlying = false;
+        document.getElementById('multiplier').style.display = 'none';
+        document.getElementById('plane-wrapper').style.display = 'none';
+        document.getElementById('curve-path').setAttribute('d', ''); // Ensure curve is gone
+        document.getElementById('next-round-timer').style.display = 'block';
+        
+        let timeLeft = 3000;
+        const interval = setInterval(() => {
+            timeLeft -= 50;
+            document.getElementById('progress-fill').style.width = (timeLeft/3000)*100 + "%";
+            if (timeLeft <= 0) {
+                clearInterval(interval);
+                startFlight();
+            }
+        }, 50);
+    }
+
+    function startFlight() {
+        isFlying = true;
+        multiplier = 1.00;
+        const crashPoint = (Math.random() * 5 + 1.01).toFixed(2);
+        
+        document.getElementById('next-round-timer').style.display = 'none';
+        document.getElementById('multiplier').style.display = 'block';
+        document.getElementById('multiplier').style.color = 'white';
+        document.getElementById('plane-wrapper').style.display = 'block';
+        
+        initFakePlayers();
+
+        // Update Button States for Active Round
+        [1, 2].forEach(id => {
+            if (bets[id].state === 'waiting') {
+                bets[id].state = 'active';
+                const btn = document.getElementById(`btn-${id}`);
+                btn.style.background = "var(--accent-gold)";
+                btn.style.color = "black";
+            }
+        });
+
+        const flightInterval = setInterval(() => {
+            multiplier += 0.01;
+            const mText = multiplier.toFixed(2);
+            document.getElementById('multiplier').innerText = mText + "x";
+
+            // Dynamic Cashout text on buttons
+            [1, 2].forEach(id => {
+                if (bets[id].state === 'active') {
+                    document.getElementById(`btn-${id}`).innerText = "CASH " + (bets[id].amount * multiplier).toFixed(1);
+                }
+            });
+
+            // Update Plane & Trail
+            const progress = multiplier - 1;
+            const x = Math.min(progress * 85, 350);
+            const y = Math.min(Math.pow(progress * 38, 1.25), 250);
+            document.getElementById('plane-wrapper').style.left = x + "px";
+            document.getElementById('plane-wrapper').style.bottom = y + "px";
+            document.getElementById('curve-path').setAttribute('d', `M 0 300 Q ${x * 0.4} 300 ${x} ${300 - y}`);
+
+            updateFakePlayers(multiplier);
+
+            if (multiplier >= crashPoint) {
+                clearInterval(flightInterval);
+                // ACTION: REMOVE CURVE IMMEDIATELY
+                document.getElementById('curve-path').setAttribute('d', ''); 
+                
+                document.getElementById('multiplier').innerText = "FLEW AWAY!";
+                document.getElementById('multiplier').style.color = "var(--accent-red)";
+                
+                history.unshift(mText);
+                if (history.length > 12) history.pop();
+                renderHistory();
+                
+                // Reset Button UI for next round
+                [1,2].forEach(id => {
+                    const btn = document.getElementById(`btn-${id}`);
+                    btn.innerText = "BET";
+                    btn.style.background = "var(--success-green)";
+                    btn.style.color = "white";
+                    bets[id] = { state: 'none', amount: 0 };
+                });
+
+                setTimeout(startCooldown, 2000);
+            }
+        }, 60);
+    }
+
+    function initFakePlayers() {
+        const names = ["Pilot_254", "Lucky_J", "Mpesa_King", "Shan_Aviator", "BigWin_KE", "User99", "Captain_Tosh"];
+        fakePlayers = names.map(n => ({
+            name: n,
+            cashout: (Math.random() * 4 + 1.1),
+            isCashed: false,
+            lost: Math.random() < 0.25 // Some players will never cash out
+        }));
+        renderPlayers();
+    }
+
+    function updateFakePlayers(m) {
+        let changed = false;
+        fakePlayers.forEach(p => {
+            if (!p.isCashed && !p.lost && m >= p.cashout) {
+                p.isCashed = true;
+                p.final = m.toFixed(2);
+                changed = true;
+            }
+        });
+        if (changed) renderPlayers();
+    }
+
+    function renderPlayers() {
+        const container = document.getElementById('player-feed');
+        container.innerHTML = '<div style="color:var(--text-dim); font-size:0.5rem; margin-bottom:5px; font-weight:bold;">LIVE BETS</div>';
+        fakePlayers.forEach(p => {
+            const val = p.isCashed ? `<span style="color:var(--success-green)">${p.final}x</span>` : `<span style="color:#444">...</span>`;
+            container.innerHTML += `<div class="player-row"><span>${p.name}</span>${val}</div>`;
+        });
+    }
+
+    function renderHistory() {
+        const h = document.getElementById('history-list');
+        h.innerHTML = history.map(v => `<span class="hist-val" style="color:${v > 2 ? 'var(--accent-gold)' : '#fff'}">${v}x</span>`).join('');
+    }
+
+    function triggerMpesaPush() { document.getElementById('mpesa-modal').style.display = 'flex'; }
+    function confirmDeposit() {
+        balance += 500;
+        updateBalanceUI();
+        document.getElementById('mpesa-modal').style.display = 'none';
+        showToast("M-PESA: KES 500 deposited succefully to your Aviator balance.");
+    }
+    function triggerWithdraw() {
+        if (balance < 50) return showToast("Minimum withdrawal is KES 50", false);
+        showToast(`KES ${balance.toFixed(2)} withdrawn to M-Pesa account +254757080224 succefully.`);
+        balance = 0;
+        updateBalanceUI();
+    }
+
+    renderHistory();
+    startCooldown();
+</script>
+</body>
+  </html>
+  
